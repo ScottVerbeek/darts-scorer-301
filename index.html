@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0d1117" />
+  <meta name="description" content="301 Darts scoring app" />
+  <link rel="manifest" href="manifest.json" />
+  <title>301 Darts</title>
+  <link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface2: #21262d;
+      --border: #30363d;
+      --chalk: #e8e6df;
+      --chalk-dim: #9e9b94;
+      --green: #00c853;
+      --red: #ff1744;
+      --amber: #ffc400;
+      --bull: #e53935;
+      --double: #1565c0;
+      --triple: #2e7d32;
+      --shadow: 0 4px 24px rgba(0,0,0,0.6);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--chalk);
+      font-family: 'Share Tech Mono', monospace;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px;
+      background-image:
+        radial-gradient(ellipse at 20% 10%, rgba(0,200,83,0.04) 0%, transparent 60%),
+        radial-gradient(ellipse at 80% 90%, rgba(21,101,192,0.05) 0%, transparent 60%);
+      overflow-x: hidden;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 12px;
+      user-select: none;
+    }
+
+    header h1 {
+      font-family: 'Permanent Marker', cursive;
+      font-size: clamp(2rem, 8vw, 3.5rem);
+      color: var(--chalk);
+      text-shadow: 0 0 30px rgba(232,230,223,0.15), 3px 3px 0 rgba(0,0,0,0.5);
+      letter-spacing: 4px;
+    }
+
+    header .subtitle {
+      color: var(--chalk-dim);
+      font-size: 0.75rem;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+
+    /* Score display */
+    .scoreboard {
+      display: flex;
+      gap: 12px;
+      width: 100%;
+      max-width: 640px;
+      margin-bottom: 14px;
+    }
+
+    .player-card {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 12px;
+      text-align: center;
+      transition: border-color 0.3s, box-shadow 0.3s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .player-card.active {
+      border-color: var(--green);
+      box-shadow: 0 0 0 1px var(--green), inset 0 0 40px rgba(0,200,83,0.06);
+    }
+
+    .player-card .player-label {
+      font-size: 0.65rem;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--chalk-dim);
+      margin-bottom: 4px;
+    }
+
+    .player-card .score-num {
+      font-family: 'Permanent Marker', cursive;
+      font-size: clamp(2.8rem, 10vw, 4.5rem);
+      line-height: 1;
+      color: var(--chalk);
+      transition: color 0.2s, transform 0.15s;
+    }
+
+    .player-card.bust .score-num { color: var(--red); animation: shake 0.4s ease; }
+    .player-card.win .score-num { color: var(--green); animation: pulse-win 0.6s ease; }
+
+    .player-card .darts-left {
+      margin-top: 6px;
+      display: flex;
+      justify-content: center;
+      gap: 5px;
+    }
+
+    .dart-pip {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--border);
+      transition: background 0.2s;
+    }
+
+    .dart-pip.thrown { background: var(--amber); }
+
+    .player-card .turn-score {
+      font-size: 0.75rem;
+      color: var(--chalk-dim);
+      margin-top: 4px;
+      min-height: 1.1em;
+    }
+
+    .turn-arrow {
+      position: absolute;
+      top: 8px; left: 8px;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      opacity: 0;
+      transition: opacity 0.3s;
+      box-shadow: 0 0 8px var(--green);
+    }
+
+    .player-card.active .turn-arrow { opacity: 1; }
+
+    /* This turn throw list */
+    .throw-list {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      min-height: 32px;
+      flex-wrap: wrap;
+      max-width: 640px;
+      width: 100%;
+    }
+
+    .throw-chip {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 0.8rem;
+      color: var(--chalk);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      animation: pop-in 0.15s ease;
+    }
+
+    .throw-chip.double { border-color: var(--double); color: #5c9fff; }
+    .throw-chip.triple { border-color: var(--triple); color: #66bb6a; }
+    .throw-chip.bull   { border-color: var(--bull); color: #ef9a9a; }
+
+    /* Modifier row */
+    .modifier-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+      max-width: 640px;
+      width: 100%;
+    }
+
+    .mod-btn {
+      flex: 1;
+      padding: 12px 6px;
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface);
+      color: var(--chalk-dim);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.78rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.15s;
+      user-select: none;
+    }
+
+    .mod-btn:hover { background: var(--surface2); }
+
+    .mod-btn.active-mod {
+      background: var(--surface2);
+      color: var(--chalk);
+    }
+
+    .mod-btn[data-mod="double"].active-mod  { border-color: var(--double); color: #5c9fff; box-shadow: 0 0 10px rgba(21,101,192,0.3); }
+    .mod-btn[data-mod="triple"].active-mod  { border-color: var(--triple); color: #66bb6a; box-shadow: 0 0 10px rgba(46,125,50,0.3); }
+    .mod-btn[data-mod="bull"].active-mod    { border-color: var(--bull);   color: #ef9a9a; box-shadow: 0 0 10px rgba(229,57,53,0.3); }
+
+    /* Number grid */
+    .number-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 7px;
+      max-width: 640px;
+      width: 100%;
+      margin-bottom: 10px;
+    }
+
+    .num-btn {
+      aspect-ratio: 1;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      background: var(--surface);
+      color: var(--chalk);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: clamp(0.8rem, 2.5vw, 1rem);
+      cursor: pointer;
+      transition: all 0.12s;
+      user-select: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .num-btn:hover { background: var(--surface2); border-color: var(--chalk-dim); transform: translateY(-1px); }
+    .num-btn:active { transform: translateY(1px) scale(0.96); }
+
+    /* Action row */
+    .action-row {
+      display: flex;
+      gap: 8px;
+      max-width: 640px;
+      width: 100%;
+      margin-bottom: 10px;
+    }
+
+    .action-btn {
+      flex: 1;
+      padding: 13px 8px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--chalk);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.82rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.15s;
+      user-select: none;
+    }
+
+    .action-btn:hover { background: var(--surface2); }
+
+    .action-btn.undo  { border-color: var(--amber); color: var(--amber); }
+    .action-btn.next  { border-color: var(--green); color: var(--green); background: rgba(0,200,83,0.08); font-size: 0.9rem; font-weight: bold; }
+    .action-btn.reset { border-color: var(--red);   color: var(--red); }
+    .action-btn.quit  { border-color: var(--border); color: var(--chalk-dim); font-size: 0.75rem; letter-spacing: 1px; }
+
+    .action-btn.next:hover  { background: rgba(0,200,83,0.15); }
+    .action-btn.undo:hover  { background: rgba(255,196,0,0.08); }
+    .action-btn.reset:hover { background: rgba(255,23,68,0.08); }
+    .action-btn.quit:hover  { border-color: var(--chalk-dim); color: var(--chalk); background: var(--surface2); }
+
+    /* Miss button */
+    .miss-btn {
+      max-width: 640px;
+      width: 100%;
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px dashed var(--border);
+      background: transparent;
+      color: var(--chalk-dim);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.78rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.15s;
+      user-select: none;
+    }
+
+    .miss-btn:hover { border-color: var(--chalk-dim); color: var(--chalk); }
+
+    /* Win overlay */
+    .win-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      z-index: 100;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      text-align: center;
+      padding: 24px;
+      backdrop-filter: blur(4px);
+    }
+
+    .win-overlay.show { display: flex; animation: fade-in 0.4s ease; }
+
+    .win-overlay h2 {
+      font-family: 'Permanent Marker', cursive;
+      font-size: clamp(2.5rem, 12vw, 5rem);
+      color: var(--green);
+      text-shadow: 0 0 40px rgba(0,200,83,0.6);
+      animation: bounce-in 0.5s cubic-bezier(0.175,0.885,0.32,1.275);
+    }
+
+    .win-overlay p {
+      color: var(--chalk-dim);
+      font-size: 1rem;
+      letter-spacing: 2px;
+    }
+
+    .win-overlay .play-again {
+      margin-top: 8px;
+      padding: 14px 40px;
+      border-radius: 10px;
+      border: 2px solid var(--green);
+      background: rgba(0,200,83,0.1);
+      color: var(--green);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 1rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .win-overlay .play-again:hover { background: rgba(0,200,83,0.2); }
+
+    /* Bust flash */
+    .bust-banner {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: var(--red);
+      color: white;
+      font-family: 'Permanent Marker', cursive;
+      font-size: clamp(1.8rem, 8vw, 3rem);
+      padding: 16px 40px;
+      border-radius: 12px;
+      z-index: 99;
+      pointer-events: none;
+      box-shadow: 0 0 60px rgba(255,23,68,0.6);
+    }
+    .bust-banner.show { display: block; animation: bust-pop 0.8s ease forwards; }
+
+    /* Animations */
+    @keyframes shake {
+      0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)} 60%{transform:translateX(-5px)} 80%{transform:translateX(5px)}
+    }
+    @keyframes pulse-win {
+      0%{transform:scale(1)} 50%{transform:scale(1.12)} 100%{transform:scale(1)}
+    }
+    @keyframes pop-in {
+      0%{transform:scale(0.7);opacity:0} 100%{transform:scale(1);opacity:1}
+    }
+    @keyframes fade-in {
+      from{opacity:0} to{opacity:1}
+    }
+    @keyframes bounce-in {
+      0%{transform:scale(0.5);opacity:0} 70%{transform:scale(1.1)} 100%{transform:scale(1);opacity:1}
+    }
+    @keyframes bust-pop {
+      0%{opacity:0;transform:translate(-50%,-50%) scale(0.6)}
+      20%{opacity:1;transform:translate(-50%,-50%) scale(1.05)}
+      40%{transform:translate(-50%,-50%) scale(1)}
+      70%{opacity:1}
+      100%{opacity:0;transform:translate(-50%,-50%) scale(1)}
+    }
+
+    /* Scoreboard history */
+    .history-toggle {
+      color: var(--chalk-dim);
+      font-size: 0.7rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      margin-top: 4px;
+      margin-bottom: 4px;
+      user-select: none;
+      text-align: center;
+      transition: color 0.2s;
+    }
+    .history-toggle:hover { color: var(--chalk); }
+
+    .history-panel {
+      display: none;
+      max-width: 640px;
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 8px;
+      max-height: 160px;
+      overflow-y: auto;
+    }
+
+    .history-panel.open { display: block; }
+
+    .history-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.75rem;
+      color: var(--chalk-dim);
+      padding: 3px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .history-row:last-child { border-bottom: none; }
+    .history-row .h-player { color: var(--chalk); }
+    .history-row .h-bust { color: var(--red); }
+
+    /* Players setup */
+    .setup-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      max-width: 400px;
+      width: 100%;
+      padding: 24px 0;
+    }
+
+    .setup-screen h2 {
+      font-family: 'Permanent Marker', cursive;
+      font-size: 1.8rem;
+      color: var(--chalk);
+      letter-spacing: 3px;
+    }
+
+    .player-count-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    .pc-btn {
+      width: 56px; height: 56px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+      background: var(--surface);
+      color: var(--chalk-dim);
+      font-family: 'Permanent Marker', cursive;
+      font-size: 1.4rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .pc-btn.selected {
+      border-color: var(--green);
+      color: var(--green);
+      box-shadow: 0 0 12px rgba(0,200,83,0.3);
+    }
+
+    .player-names {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: 100%;
+    }
+
+    .name-input {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--chalk);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .name-input:focus { border-color: var(--green); }
+    .name-input::placeholder { color: var(--chalk-dim); }
+
+    .start-btn {
+      width: 100%;
+      padding: 14px;
+      border-radius: 10px;
+      border: 2px solid var(--green);
+      background: rgba(0,200,83,0.1);
+      color: var(--green);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 1rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .start-btn:hover { background: rgba(0,200,83,0.2); }
+
+    #game-screen { display: none; width: 100%; align-items: center; flex-direction: column; }
+    #setup-screen-wrap { display: flex; width: 100%; justify-content: center; }
+
+    /* Bull labels */
+    .mod-btn[data-mod="bull"] .bull-labels {
+      display: flex;
+      flex-direction: column;
+      line-height: 1.1;
+      align-items: center;
+    }
+
+    .mod-btn[data-mod="bull"] .bull-labels span:first-child {
+      font-size: 0.85rem;
+    }
+
+    .mod-btn[data-mod="bull"] .bull-labels span:last-child {
+      font-size: 0.6rem;
+      color: var(--chalk-dim);
+    }
+
+    .legend {
+      display: flex;
+      gap: 12px;
+      font-size: 0.65rem;
+      color: var(--chalk-dim);
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+    .legend span { display: flex; align-items: center; gap: 4px; }
+    .legend-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🎯 301</h1>
+  <div class="subtitle">Darts Scorer</div>
+</header>
+
+<!-- Setup Screen -->
+<div id="setup-screen-wrap">
+  <div class="setup-screen" id="setup-screen">
+    <h2>Players</h2>
+    <div class="player-count-row" id="player-count-row">
+      <button class="pc-btn selected" data-count="1">1</button>
+      <button class="pc-btn" data-count="2">2</button>
+      <button class="pc-btn" data-count="3">3</button>
+      <button class="pc-btn" data-count="4">4</button>
+    </div>
+    <div class="player-names" id="player-names"></div>
+    <button class="start-btn" id="start-btn">Start Game</button>
+  </div>
+</div>
+
+<!-- Game Screen -->
+<div id="game-screen">
+
+  <!-- Scoreboard -->
+  <div class="scoreboard" id="scoreboard"></div>
+
+  <!-- Throw list -->
+  <div class="throw-list" id="throw-list"></div>
+
+  <!-- Modifier buttons -->
+  <div class="modifier-row">
+    <button class="mod-btn" data-mod="double">
+      <div>✕2</div><div style="font-size:0.6rem;margin-top:2px">Double</div>
+    </button>
+    <button class="mod-btn" data-mod="triple">
+      <div>✕3</div><div style="font-size:0.6rem;margin-top:2px">Triple</div>
+    </button>
+    <button class="mod-btn" data-mod="bull">
+      <div class="bull-labels"><span>🎯</span><span>Bull / Bull's Eye</span></div>
+    </button>
+  </div>
+
+  <!-- Number grid -->
+  <div class="number-grid" id="number-grid"></div>
+
+  <!-- Legend -->
+  <div class="legend">
+    <span><span class="legend-dot" style="background:var(--double)"></span>Double</span>
+    <span><span class="legend-dot" style="background:var(--triple)"></span>Triple</span>
+    <span><span class="legend-dot" style="background:var(--bull)"></span>Bull</span>
+    <span><span class="legend-dot" style="background:var(--amber)"></span>Dart thrown</span>
+  </div>
+
+  <!-- Miss -->
+  <button class="miss-btn" id="miss-btn">Miss (0)</button>
+
+  <!-- Actions -->
+  <div class="action-row">
+    <button class="action-btn undo" id="undo-btn">↩ Undo</button>
+    <button class="action-btn next" id="next-btn">Next →</button>
+    <button class="action-btn reset" id="reset-btn">↺ Reset</button>
+  </div>
+
+  <!-- Quit -->
+  <div class="action-row" style="margin-top:-2px">
+    <button class="action-btn quit" id="quit-btn">✕ Quit &amp; Change Players</button>
+  </div>
+
+  <!-- History -->
+  <div class="history-toggle" id="history-toggle">▸ Round History</div>
+  <div class="history-panel" id="history-panel"></div>
+
+</div>
+
+<!-- Bust Banner -->
+<div class="bust-banner" id="bust-banner">BUST!</div>
+
+<!-- Win Overlay -->
+<div class="win-overlay" id="win-overlay">
+  <h2 id="win-title">🎯 WINNER!</h2>
+  <p id="win-subtitle"></p>
+  <button class="play-again" id="play-again-btn">Play Again</button>
+  <button class="play-again" id="setup-from-win-btn" style="background:transparent;border-color:var(--chalk-dim);color:var(--chalk-dim);margin-top:-8px;font-size:0.8rem">Change Players</button>
+</div>
+
+<script>
+  // ── State ──────────────────────────────────────────────────────────────────
+  const STARTING_SCORE = 301;
+
+  let players = [];       // { name, score, history }
+  let currentPlayer = 0;
+  let currentMod = null;  // 'double' | 'triple' | 'bull' | null
+  let currentThrows = []; // { label, value, mod } per dart this turn
+  let historyLog = [];    // { player, throws, scoreBefore, scoreAfter, bust }
+
+  // ── Setup Screen ───────────────────────────────────────────────────────────
+  const playerCountBtns = document.querySelectorAll('.pc-btn');
+  const playerNamesDiv  = document.getElementById('player-names');
+  let numPlayers = 1;
+
+  function renderSetupNames() {
+    playerNamesDiv.innerHTML = '';
+    for (let i = 0; i < numPlayers; i++) {
+      const inp = document.createElement('input');
+      inp.className = 'name-input';
+      inp.placeholder = `Player ${i + 1} name`;
+      inp.value = numPlayers === 1 ? 'Player 1' : '';
+      inp.maxLength = 16;
+      playerNamesDiv.appendChild(inp);
+    }
+  }
+
+  playerCountBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      playerCountBtns.forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      numPlayers = parseInt(btn.dataset.count);
+      renderSetupNames();
+    });
+  });
+
+  renderSetupNames();
+
+  document.getElementById('start-btn').addEventListener('click', () => {
+    const inputs = playerNamesDiv.querySelectorAll('input');
+    players = Array.from(inputs).map((inp, i) => ({
+      name: inp.value.trim() || `Player ${i + 1}`,
+      score: STARTING_SCORE,
+      history: []
+    }));
+    currentPlayer = 0;
+    currentThrows = [];
+    historyLog = [];
+    document.getElementById('setup-screen-wrap').style.display = 'none';
+    document.getElementById('game-screen').style.display = 'flex';
+    renderAll();
+  });
+
+  // ── Build number grid ──────────────────────────────────────────────────────
+  const grid = document.getElementById('number-grid');
+  for (let n = 1; n <= 20; n++) {
+    const btn = document.createElement('button');
+    btn.className = 'num-btn';
+    btn.textContent = n;
+    btn.addEventListener('click', () => throwDart(n));
+    grid.appendChild(btn);
+  }
+
+  // ── Modifier buttons ───────────────────────────────────────────────────────
+  document.querySelectorAll('.mod-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const mod = btn.dataset.mod;
+      if (mod === 'bull') {
+        // Bull cycles: none → 25 → 50 → none
+        if (currentMod === 'bull') {
+          throwDart('bull'); // 25
+        } else if (currentMod === 'bullseye') {
+          throwDart('bullseye'); // 50
+        } else {
+          // First press: show sub-choice via two quick prompts
+          // Actually: first tap = bull (25), long-press = bullseye (50)
+          // Simpler: first tap → ask
+          showBullChoice();
+        }
+        return;
+      }
+      currentMod = currentMod === mod ? null : mod;
+      renderModifiers();
+    });
+  });
+
+  function showBullChoice() {
+    // Replace bull button temporarily with two options
+    const modRow = document.querySelector('.modifier-row');
+    const existing = modRow.innerHTML;
+
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'display:flex;gap:8px;width:100%;position:absolute;inset:0;z-index:10;padding:0;';
+    overlay.innerHTML = `
+      <button class="mod-btn active-mod" id="bull25" style="flex:1;border-color:var(--bull);color:#ef9a9a">Bull (25)</button>
+      <button class="mod-btn active-mod" id="bull50" style="flex:1;border-color:var(--bull);color:#ef5350">Bull's Eye (50)</button>
+      <button class="mod-btn" id="bull-cancel" style="flex:0 0 60px">✕</button>
+    `;
+    modRow.style.position = 'relative';
+    modRow.appendChild(overlay);
+
+    overlay.querySelector('#bull25').addEventListener('click', () => { overlay.remove(); throwDart('bull'); });
+    overlay.querySelector('#bull50').addEventListener('click', () => { overlay.remove(); throwDart('bullseye'); });
+    overlay.querySelector('#bull-cancel').addEventListener('click', () => overlay.remove());
+  }
+
+  // ── Throw logic ────────────────────────────────────────────────────────────
+  function throwDart(input) {
+    if (currentThrows.length >= 3) return;
+
+    let value, label, modClass = '';
+
+    if (input === 'bull') {
+      value = 25; label = 'Bull'; modClass = 'bull';
+    } else if (input === 'bullseye') {
+      value = 50; label = "Bull's Eye"; modClass = 'bull';
+    } else {
+      const num = input;
+      if (currentMod === 'double') {
+        value = num * 2; label = `D${num}`; modClass = 'double';
+      } else if (currentMod === 'triple') {
+        value = num * 3; label = `T${num}`; modClass = 'triple';
+      } else {
+        value = num; label = `${num}`;
+      }
+    }
+
+    currentThrows.push({ label, value, modClass });
+    currentMod = null;
+
+    renderModifiers();
+    renderThrowList();
+    renderScoreboard(/* preview */ true);
+
+    if (currentThrows.length === 3) {
+      setTimeout(endTurn, 300);
+    }
+  }
+
+  document.getElementById('miss-btn').addEventListener('click', () => {
+    throwDart(0);
+  });
+
+  // Override throwDart for miss
+  const _origThrow = throwDart;
+  window.throwDart = function(input) {
+    if (input === 0) {
+      if (currentThrows.length >= 3) return;
+      currentThrows.push({ label: 'Miss', value: 0, modClass: '' });
+      currentMod = null;
+      renderModifiers();
+      renderThrowList();
+      renderScoreboard(true);
+      if (currentThrows.length === 3) setTimeout(endTurn, 300);
+      return;
+    }
+    _origThrow(input);
+  };
+
+  function endTurn() {
+    const p = players[currentPlayer];
+    const total = currentThrows.reduce((s, t) => s + t.value, 0);
+    const scoreBefore = p.score;
+    const newScore = p.score - total;
+
+    let bust = false;
+    if (newScore < 0 || newScore === 1) {
+      bust = true;
+    } else {
+      p.score = newScore;
+    }
+
+    historyLog.push({
+      player: p.name,
+      throws: currentThrows.map(t => t.label).join(', '),
+      total,
+      scoreBefore,
+      scoreAfter: bust ? scoreBefore : newScore,
+      bust
+    });
+
+    if (bust) {
+      showBust();
+    } else if (p.score === 0) {
+      showWin(p.name);
+      renderScoreboard(false);
+      return;
+    }
+
+    currentThrows = [];
+    if (!bust) {
+      currentPlayer = (currentPlayer + 1) % players.length;
+    } else {
+      currentThrows = [];
+    }
+    currentMod = null;
+
+    setTimeout(() => {
+      if (!bust) {
+        // already advanced
+      }
+      renderAll();
+    }, bust ? 900 : 0);
+  }
+
+  // ── Bust ───────────────────────────────────────────────────────────────────
+  function showBust() {
+    const banner = document.getElementById('bust-banner');
+    banner.className = 'bust-banner show';
+    const card = document.querySelector(`.player-card[data-idx="${currentPlayer}"]`);
+    if (card) card.classList.add('bust');
+    setTimeout(() => {
+      banner.className = 'bust-banner';
+      if (card) card.classList.remove('bust');
+    }, 900);
+  }
+
+  // ── Win ────────────────────────────────────────────────────────────────────
+  function showWin(name) {
+    document.getElementById('win-title').textContent = `🎯 ${name.toUpperCase()}`;
+    document.getElementById('win-subtitle').textContent = 'HITS EXACTLY 301!';
+    document.getElementById('win-overlay').classList.add('show');
+  }
+
+  document.getElementById('play-again-btn').addEventListener('click', () => {
+    document.getElementById('win-overlay').classList.remove('show');
+    players.forEach(p => p.score = STARTING_SCORE);
+    currentPlayer = 0; currentThrows = []; historyLog = []; currentMod = null;
+    renderAll();
+  });
+
+  // ── Actions ────────────────────────────────────────────────────────────────
+  document.getElementById('next-btn').addEventListener('click', () => {
+    if (currentThrows.length === 0) return;
+    endTurn();
+  });
+
+  document.getElementById('undo-btn').addEventListener('click', () => {
+    if (currentThrows.length > 0) {
+      currentThrows.pop();
+      currentMod = null;
+      renderModifiers();
+      renderThrowList();
+      renderScoreboard(true);
+    } else if (historyLog.length > 0) {
+      const last = historyLog.pop();
+      const idx = players.findIndex(p => p.name === last.player);
+      if (idx !== -1) players[idx].score = last.scoreBefore;
+      currentPlayer = idx;
+      currentMod = null;
+      renderAll();
+    }
+  });
+
+  document.getElementById('reset-btn').addEventListener('click', () => {
+    showConfirm('Reset scores to 301?', () => {
+      players.forEach(p => p.score = STARTING_SCORE);
+      currentPlayer = 0; currentThrows = []; historyLog = []; currentMod = null;
+      renderAll();
+    });
+  });
+
+  // ── Quit / Go to Setup ────────────────────────────────────────────────────
+  function goToSetup() {
+    document.getElementById('win-overlay').classList.remove('show');
+    document.getElementById('game-screen').style.display = 'none';
+    document.getElementById('setup-screen-wrap').style.display = 'flex';
+    playerCountBtns.forEach(b => b.classList.toggle('selected', b.dataset.count === String(numPlayers)));
+    renderSetupNames();
+  }
+
+  document.getElementById('quit-btn').addEventListener('click', () => {
+    showConfirm('Quit and change players?', goToSetup);
+  });
+
+  document.getElementById('setup-from-win-btn').addEventListener('click', () => {
+    goToSetup();
+  });
+
+  // ── Inline confirm dialog ─────────────────────────────────────────────────
+  function showConfirm(message, onConfirm) {
+    // Remove any existing confirm dialog
+    const existing = document.getElementById('inline-confirm');
+    if (existing) existing.remove();
+
+    const dialog = document.createElement('div');
+    dialog.id = 'inline-confirm';
+    dialog.style.cssText = `
+      position: fixed; inset: 0; z-index: 200;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(0,0,0,0.75); backdrop-filter: blur(4px);
+      animation: fade-in 0.2s ease;
+    `;
+    dialog.innerHTML = `
+      <div style="
+        background: var(--surface); border: 1px solid var(--border);
+        border-radius: 14px; padding: 24px 28px; max-width: 300px; width: 90%;
+        text-align: center; box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+      ">
+        <div style="font-family:'Share Tech Mono',monospace; color:var(--chalk); font-size:0.95rem; margin-bottom:20px; line-height:1.5;">
+          ${message}
+        </div>
+        <div style="display:flex; gap:10px; justify-content:center;">
+          <button id="confirm-yes" style="
+            flex:1; padding:10px; border-radius:8px;
+            border:1px solid var(--red); background:rgba(255,23,68,0.1);
+            color:var(--red); font-family:'Share Tech Mono',monospace;
+            font-size:0.85rem; letter-spacing:1px; cursor:pointer;
+          ">Yes</button>
+          <button id="confirm-no" style="
+            flex:1; padding:10px; border-radius:8px;
+            border:1px solid var(--border); background:var(--surface2);
+            color:var(--chalk-dim); font-family:'Share Tech Mono',monospace;
+            font-size:0.85rem; letter-spacing:1px; cursor:pointer;
+          ">Cancel</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(dialog);
+
+    dialog.querySelector('#confirm-yes').addEventListener('click', () => {
+      dialog.remove();
+      onConfirm();
+    });
+    dialog.querySelector('#confirm-no').addEventListener('click', () => {
+      dialog.remove();
+    });
+    // Click outside to cancel
+    dialog.addEventListener('click', e => { if (e.target === dialog) dialog.remove(); });
+  }
+
+  // ── History toggle ─────────────────────────────────────────────────────────
+  document.getElementById('history-toggle').addEventListener('click', () => {
+    const panel = document.getElementById('history-panel');
+    const toggle = document.getElementById('history-toggle');
+    panel.classList.toggle('open');
+    toggle.textContent = panel.classList.contains('open') ? '▾ Round History' : '▸ Round History';
+    renderHistory();
+  });
+
+  // ── Render functions ───────────────────────────────────────────────────────
+  function renderAll() {
+    renderScoreboard(false);
+    renderThrowList();
+    renderModifiers();
+    renderHistory();
+  }
+
+  function renderScoreboard(preview) {
+    const sb = document.getElementById('scoreboard');
+    sb.innerHTML = '';
+
+    players.forEach((p, i) => {
+      const previewScore = (preview && i === currentPlayer)
+        ? p.score - currentThrows.reduce((s, t) => s + t.value, 0)
+        : p.score;
+
+      const card = document.createElement('div');
+      card.className = 'player-card' + (i === currentPlayer ? ' active' : '');
+      card.dataset.idx = i;
+
+      const turnTotal = preview && i === currentPlayer
+        ? currentThrows.reduce((s, t) => s + t.value, 0)
+        : 0;
+
+      const displayScore = (preview && i === currentPlayer)
+        ? Math.max(previewScore, -99)
+        : p.score;
+
+      const isBust = preview && i === currentPlayer && previewScore < 0;
+      if (isBust) card.classList.add('bust');
+
+      // Darts pips
+      let pips = '';
+      for (let d = 0; d < 3; d++) {
+        const thrown = i === currentPlayer && d < currentThrows.length;
+        pips += `<div class="dart-pip${thrown ? ' thrown' : ''}"></div>`;
+      }
+
+      card.innerHTML = `
+        <div class="turn-arrow"></div>
+        <div class="player-label">${p.name}</div>
+        <div class="score-num">${isBust ? 'BUST' : displayScore}</div>
+        <div class="darts-left">${pips}</div>
+        <div class="turn-score">${i === currentPlayer && turnTotal > 0 ? `−${turnTotal}` : ''}</div>
+      `;
+      sb.appendChild(card);
+    });
+  }
+
+  function renderThrowList() {
+    const tl = document.getElementById('throw-list');
+    tl.innerHTML = '';
+    currentThrows.forEach(t => {
+      const chip = document.createElement('div');
+      chip.className = 'throw-chip' + (t.modClass ? ' ' + t.modClass : '');
+      chip.textContent = t.label + (t.value > 0 ? ` (${t.value})` : '');
+      tl.appendChild(chip);
+    });
+  }
+
+  function renderModifiers() {
+    document.querySelectorAll('.mod-btn').forEach(btn => {
+      const mod = btn.dataset.mod;
+      btn.classList.toggle('active-mod', mod === currentMod);
+    });
+  }
+
+  function renderHistory() {
+    const panel = document.getElementById('history-panel');
+    if (!panel.classList.contains('open')) return;
+    panel.innerHTML = '';
+    if (historyLog.length === 0) {
+      panel.innerHTML = '<div style="color:var(--chalk-dim);font-size:0.75rem;text-align:center;padding:8px">No rounds yet</div>';
+      return;
+    }
+    [...historyLog].reverse().forEach(row => {
+      const el = document.createElement('div');
+      el.className = 'history-row';
+      el.innerHTML = `
+        <span class="h-player">${row.player}</span>
+        <span>${row.throws}</span>
+        <span>${row.bust ? '<span class="h-bust">BUST</span>' : `−${row.total} → ${row.scoreAfter}`}</span>
+      `;
+      panel.appendChild(el);
+    });
+  }
+
+  // ── Service Worker (PWA) ──────────────────────────────────────────────────
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+</script>
+</body>
+</html>
