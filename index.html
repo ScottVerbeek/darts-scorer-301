@@ -214,7 +214,7 @@
     /* Number grid */
     .number-grid {
       display: grid;
-      grid-template-columns: repeat(7, 1fr);
+      grid-template-columns: repeat(5, 1fr);
       gap: 7px;
       max-width: 640px;
       width: 100%;
@@ -593,6 +593,9 @@
   <!-- Number grid -->
   <div class="number-grid" id="number-grid"></div>
 
+  <!-- Miss -->
+  <button class="miss-btn" id="miss-btn">Miss (0)</button>
+
   <!-- Legend -->
   <div class="legend">
     <span><span class="legend-dot" style="background:var(--double)"></span>Double</span>
@@ -600,9 +603,6 @@
     <span><span class="legend-dot" style="background:var(--bull)"></span>Bull</span>
     <span><span class="legend-dot" style="background:var(--amber)"></span>Dart thrown</span>
   </div>
-
-  <!-- Miss -->
-  <button class="miss-btn" id="miss-btn">Miss (0)</button>
 
   <!-- Actions -->
   <div class="action-row">
