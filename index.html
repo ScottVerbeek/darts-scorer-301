@@ -634,6 +634,14 @@
 </div>
 
 <script>
+  // ── Haptic feedback ────────────────────────────────────────────────────────
+  function haptic(ms = 10) {
+    navigator.vibrate?.(ms);
+  }
+  document.addEventListener('click', e => {
+    if (e.target.closest('button')) haptic();
+  });
+
   // ── State ──────────────────────────────────────────────────────────────────
   const STARTING_SCORE = 301;
 
