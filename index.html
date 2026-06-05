@@ -544,6 +544,162 @@
     .legend-dot {
       width: 8px; height: 8px; border-radius: 50%;
     }
+
+    /* ── Column wrappers (transparent on mobile) ─────────────────────────── */
+    .game-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+    }
+
+    /* ── TV / Kiosk layout ───────────────────────────────────────────────── */
+    @media (min-width: 860px) {
+      body {
+        height: 100dvh;
+        min-height: unset;
+        overflow: hidden;
+        padding: 10px 14px;
+        align-items: stretch;
+      }
+
+      header {
+        flex-shrink: 0;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: baseline;
+        justify-content: center;
+        gap: 12px;
+      }
+
+      header h1 {
+        font-size: 1.6rem;
+      }
+
+      header .subtitle {
+        margin-top: 0;
+        font-size: 0.65rem;
+      }
+
+      #game-screen {
+        flex-direction: row !important;
+        align-items: stretch !important;
+        flex: 1;
+        min-height: 0;
+        gap: 14px;
+        overflow: hidden;
+        width: 100%;
+      }
+
+      .game-col {
+        min-width: 0;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      /* Left column – player cards stack vertically */
+      .col-left {
+        width: clamp(180px, 20%, 280px);
+        flex-shrink: 0;
+        align-items: stretch;
+      }
+
+      .col-left .scoreboard {
+        flex-direction: column;
+        flex: 1;
+        max-width: none;
+        width: 100%;
+        margin-bottom: 0;
+        gap: 10px;
+        overflow-y: auto;
+      }
+
+      .col-left .player-card {
+        flex: 1;
+      }
+
+      .col-left .player-card .score-num {
+        font-size: clamp(2rem, 5vw, 3.5rem);
+      }
+
+      /* Center column – dart input */
+      .col-center {
+        flex: 1;
+        align-items: center;
+        overflow-y: auto;
+        justify-content: center;
+      }
+
+      .col-center .throw-list,
+      .col-center .modifier-row,
+      .col-center .number-grid,
+      .col-center .miss-btn,
+      .col-center .legend {
+        max-width: 440px;
+        width: 100%;
+      }
+
+      .col-center .modifier-row {
+        margin-bottom: 10px;
+      }
+
+      .col-center .mod-btn {
+        padding: 14px 8px;
+        font-size: 0.88rem;
+      }
+
+      .col-center .num-btn {
+        font-size: clamp(0.9rem, 1.6vw, 1.2rem);
+      }
+
+      /* Right column – actions + history */
+      .col-right {
+        width: clamp(220px, 26%, 340px);
+        flex-shrink: 0;
+        align-items: stretch;
+        overflow: hidden;
+      }
+
+      .col-right .action-row,
+      .col-right .history-toggle {
+        max-width: none;
+        width: 100%;
+      }
+
+      .col-right .action-btn {
+        padding: 15px 8px;
+        font-size: 0.85rem;
+      }
+
+      /* History always visible and fills remaining space in TV mode */
+      .col-right .history-toggle {
+        display: none;
+      }
+
+      .col-right .history-panel {
+        display: flex !important;
+        flex-direction: column;
+        flex: 1;
+        max-width: none;
+        max-height: none;
+        width: 100%;
+        overflow-y: auto;
+        margin-bottom: 0;
+      }
+
+      .col-right .history-panel::before {
+        content: 'Round History';
+        display: block;
+        font-size: 0.7rem;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: var(--chalk-dim);
+        padding-bottom: 6px;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 6px;
+        flex-shrink: 0;
+      }
+    }
   </style>
 </head>
 <body>
@@ -571,54 +727,54 @@
 <!-- Game Screen -->
 <div id="game-screen">
 
-  <!-- Scoreboard -->
-  <div class="scoreboard" id="scoreboard"></div>
-
-  <!-- Throw list -->
-  <div class="throw-list" id="throw-list"></div>
-
-  <!-- Modifier buttons -->
-  <div class="modifier-row">
-    <button class="mod-btn" data-mod="double">
-      <div>✕2</div><div style="font-size:0.6rem;margin-top:2px">Double</div>
-    </button>
-    <button class="mod-btn" data-mod="triple">
-      <div>✕3</div><div style="font-size:0.6rem;margin-top:2px">Triple</div>
-    </button>
-    <button class="mod-btn" data-mod="bull">
-      <div class="bull-labels"><span>🎯</span><span>Bull / Bull's Eye</span></div>
-    </button>
+  <!-- Left column: Players -->
+  <div class="game-col col-left">
+    <div class="scoreboard" id="scoreboard"></div>
   </div>
 
-  <!-- Number grid -->
-  <div class="number-grid" id="number-grid"></div>
+  <!-- Center column: Dart input -->
+  <div class="game-col col-center">
+    <div class="throw-list" id="throw-list"></div>
 
-  <!-- Miss -->
-  <button class="miss-btn" id="miss-btn">Miss (0)</button>
+    <div class="modifier-row">
+      <button class="mod-btn" data-mod="double">
+        <div>✕2</div><div style="font-size:0.6rem;margin-top:2px">Double</div>
+      </button>
+      <button class="mod-btn" data-mod="triple">
+        <div>✕3</div><div style="font-size:0.6rem;margin-top:2px">Triple</div>
+      </button>
+      <button class="mod-btn" data-mod="bull">
+        <div class="bull-labels"><span>🎯</span><span>Bull / Bull's Eye</span></div>
+      </button>
+    </div>
 
-  <!-- Legend -->
-  <div class="legend">
-    <span><span class="legend-dot" style="background:var(--double)"></span>Double</span>
-    <span><span class="legend-dot" style="background:var(--triple)"></span>Triple</span>
-    <span><span class="legend-dot" style="background:var(--bull)"></span>Bull</span>
-    <span><span class="legend-dot" style="background:var(--amber)"></span>Dart thrown</span>
+    <div class="number-grid" id="number-grid"></div>
+
+    <button class="miss-btn" id="miss-btn">Miss (0)</button>
+
+    <div class="legend">
+      <span><span class="legend-dot" style="background:var(--double)"></span>Double</span>
+      <span><span class="legend-dot" style="background:var(--triple)"></span>Triple</span>
+      <span><span class="legend-dot" style="background:var(--bull)"></span>Bull</span>
+      <span><span class="legend-dot" style="background:var(--amber)"></span>Dart thrown</span>
+    </div>
   </div>
 
-  <!-- Actions -->
-  <div class="action-row">
-    <button class="action-btn undo" id="undo-btn">↩ Undo</button>
-    <button class="action-btn next" id="next-btn">Next →</button>
-    <button class="action-btn reset" id="reset-btn">↺ Reset</button>
-  </div>
+  <!-- Right column: Actions + History -->
+  <div class="game-col col-right">
+    <div class="action-row">
+      <button class="action-btn undo" id="undo-btn">↩ Undo</button>
+      <button class="action-btn next" id="next-btn">Next →</button>
+      <button class="action-btn reset" id="reset-btn">↺ Reset</button>
+    </div>
 
-  <!-- Quit -->
-  <div class="action-row" style="margin-top:-2px">
-    <button class="action-btn quit" id="quit-btn">✕ Quit &amp; Change Players</button>
-  </div>
+    <div class="action-row" style="margin-top:-2px">
+      <button class="action-btn quit" id="quit-btn">✕ Quit &amp; Change Players</button>
+    </div>
 
-  <!-- History -->
-  <div class="history-toggle" id="history-toggle">▸ Round History</div>
-  <div class="history-panel" id="history-panel"></div>
+    <div class="history-toggle" id="history-toggle">▸ Round History</div>
+    <div class="history-panel" id="history-panel"></div>
+  </div>
 
 </div>
 
@@ -691,6 +847,7 @@
     historyLog = [];
     document.getElementById('setup-screen-wrap').style.display = 'none';
     document.getElementById('game-screen').style.display = 'flex';
+    applyTvMode();
     renderAll();
   });
 
@@ -869,6 +1026,7 @@
     document.getElementById('win-overlay').classList.remove('show');
     players.forEach(p => p.score = STARTING_SCORE);
     currentPlayer = 0; currentThrows = []; historyLog = []; currentMod = null;
+    applyTvMode();
     renderAll();
   });
 
@@ -971,6 +1129,18 @@
     // Click outside to cancel
     dialog.addEventListener('click', e => { if (e.target === dialog) dialog.remove(); });
   }
+
+  // ── TV / Kiosk mode helpers ────────────────────────────────────────────────
+  const tvQuery = window.matchMedia('(min-width: 860px)');
+
+  function applyTvMode() {
+    const panel = document.getElementById('history-panel');
+    if (tvQuery.matches) {
+      panel.classList.add('open');
+    }
+  }
+
+  tvQuery.addEventListener('change', applyTvMode);
 
   // ── History toggle ─────────────────────────────────────────────────────────
   document.getElementById('history-toggle').addEventListener('click', () => {
