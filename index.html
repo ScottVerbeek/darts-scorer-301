@@ -559,7 +559,6 @@
       width: min(100%, 70ch);
       aspect-ratio: 1;
       margin: 0 auto 8px;
-      flex-shrink: 0;
       position: relative;
     }
 
@@ -691,7 +690,7 @@
       .col-center {
         flex: 1;
         align-items: center;
-        overflow-y: auto;
+        overflow: hidden;
         justify-content: flex-start;
         padding-top: 4px;
       }
@@ -718,14 +717,33 @@
         font-size: clamp(0.9rem, 1.6vw, 1.2rem);
       }
 
+      .col-center .miss-btn {
+        padding: 16px;
+        font-size: 1.1rem;
+        letter-spacing: 3px;
+      }
+
       /* Dartboard replaces number grid + modifier row on TV */
-      .dartboard-wrap { display: block; }
+      .dartboard-wrap {
+        display: flex;
+        flex: 1;
+        min-height: 0;
+        width: auto;
+        max-width: 100%;
+        margin: 0 auto 4px;
+        flex-shrink: 1;
+      }
+      .dartboard-wrap #dartboard-svg {
+        width: auto;
+        height: 100%;
+        max-width: 100%;
+      }
       .col-center .number-grid { display: none; }
       .col-center .modifier-row { display: none; }
 
       /* Right column – actions + history */
       .col-right {
-        width: clamp(220px, 26%, 340px);
+        width: clamp(300px, 34%, 460px);
         flex-shrink: 0;
         align-items: stretch;
         overflow: hidden;
@@ -830,12 +848,6 @@
 
     <button class="miss-btn" id="miss-btn">Miss (0)</button>
 
-    <div class="legend">
-      <span><span class="legend-dot" style="background:var(--double)"></span>Double</span>
-      <span><span class="legend-dot" style="background:var(--triple)"></span>Triple</span>
-      <span><span class="legend-dot" style="background:var(--bull)"></span>Bull</span>
-      <span><span class="legend-dot" style="background:var(--amber)"></span>Dart thrown</span>
-    </div>
   </div>
 
   <!-- Right column: Actions + History -->
