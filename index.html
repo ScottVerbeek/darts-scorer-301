@@ -553,6 +553,71 @@
       width: 100%;
     }
 
+    /* ── Dartboard ───────────────────────────────────────────────────────── */
+    .dartboard-wrap {
+      display: none;
+      width: min(100%, 80vh);
+      aspect-ratio: 1;
+      margin: 0 auto 8px;
+      flex-shrink: 0;
+      position: relative;
+    }
+
+    #dartboard-svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: none;
+    }
+
+    /* ── Magnifying lens ─────────────────────────────────────────────────── */
+    .dart-lens {
+      position: fixed;
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      overflow: hidden;
+      pointer-events: none;
+      z-index: 500;
+      display: none;
+      transform: translate(-50%, -50%);
+      border: 2.5px solid rgba(210, 215, 240, 0.75);
+      box-shadow:
+        0 0 0 1px rgba(0,0,0,0.55),
+        0 6px 28px rgba(0,0,0,0.75),
+        inset 0 1px 3px rgba(255,255,255,0.15);
+    }
+
+    .dart-lens::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      z-index: 11;
+      pointer-events: none;
+      background:
+        linear-gradient(white 0, white 100%) center/4px 32px no-repeat,
+        linear-gradient(white 0, white 100%) center/32px 4px no-repeat,
+        linear-gradient(var(--green) 0, var(--green) 100%) center/2px 28px no-repeat,
+        linear-gradient(var(--green) 0, var(--green) 100%) center/28px 2px no-repeat;
+    }
+
+    .dart-lens::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 28%, rgba(255,255,255,0.11), transparent 62%);
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    .lens-inner {
+      position: absolute;
+      top: 0;
+      left: 0;
+      will-change: transform;
+    }
+
     /* ── TV / Kiosk layout ───────────────────────────────────────────────── */
     @media (min-width: 860px) {
       body {
@@ -627,7 +692,8 @@
         flex: 1;
         align-items: center;
         overflow-y: auto;
-        justify-content: center;
+        justify-content: flex-start;
+        padding-top: 4px;
       }
 
       .col-center .throw-list,
@@ -651,6 +717,11 @@
       .col-center .num-btn {
         font-size: clamp(0.9rem, 1.6vw, 1.2rem);
       }
+
+      /* Dartboard replaces number grid + modifier row on TV */
+      .dartboard-wrap { display: block; }
+      .col-center .number-grid { display: none; }
+      .col-center .modifier-row { display: none; }
 
       /* Right column – actions + history */
       .col-right {
@@ -749,6 +820,9 @@
     </div>
 
     <div class="number-grid" id="number-grid"></div>
+
+    <!-- Dartboard (TV/large screen only) -->
+    <div class="dartboard-wrap" id="dartboard-wrap"></div>
 
     <button class="miss-btn" id="miss-btn">Miss (0)</button>
 
@@ -957,6 +1031,208 @@
     _origThrow(input);
   };
 
+  // ── Direct throw (used by dartboard SVG) ──────────────────────────────────
+  function throwDartDirect(value, label, modClass) {
+    if (currentThrows.length >= 3) return;
+    currentThrows.push({ label, value, modClass: modClass === 'single' ? '' : modClass });
+    renderModifiers();
+    renderThrowList();
+    renderScoreboard(true);
+    if (currentThrows.length === 3) setTimeout(endTurn, 300);
+  }
+
+  // ── SVG Dartboard ──────────────────────────────────────────────────────────
+  function buildDartboard() {
+    const container = document.getElementById('dartboard-wrap');
+    if (!container || container.children.length) return;
+
+    const NUMS = [20,1,18,4,13,6,10,15,2,17,3,19,7,16,8,11,14,9,12,5];
+    const SZ = 400, CX = 200, CY = 200, R = 172;
+
+    const rBs  = R * 0.052;   // bullseye outer
+    const rBull = R * 0.130;  // bull outer
+    const rTi  = R * 0.629;   // triple inner
+    const rTo  = R * 0.670;   // triple outer
+    const rDi  = R * 0.953;   // double inner
+    const rDo  = R;            // double outer (scoring edge)
+    const rLbl = R + 14;       // number label radius
+
+    const ns = 'http://www.w3.org/2000/svg';
+
+    function el(tag, attrs) {
+      const e = document.createElementNS(ns, tag);
+      for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+      return e;
+    }
+
+    // Polar → cartesian (0° = top, clockwise)
+    function pc(angleDeg, radius) {
+      const rad = (angleDeg - 90) * Math.PI / 180;
+      return [CX + radius * Math.cos(rad), CY + radius * Math.sin(rad)];
+    }
+
+    // SVG arc path between two radii and two angles
+    function arc(r1, r2, a1, a2) {
+      const [x1,y1] = pc(a1,r1), [x2,y2] = pc(a2,r1);
+      const [x3,y3] = pc(a2,r2), [x4,y4] = pc(a1,r2);
+      const lg = (a2 - a1) > 180 ? 1 : 0;
+      return `M${x1},${y1}A${r1},${r1},0,${lg},1,${x2},${y2}L${x3},${y3}A${r2},${r2},0,${lg},0,${x4},${y4}Z`;
+    }
+
+    const board = el('svg', {
+      viewBox: `0 0 ${SZ} ${SZ}`,
+      id: 'dartboard-svg',
+      'preserveAspectRatio': 'xMidYMid meet'
+    });
+
+    // Black surround & wire ring
+    board.appendChild(el('circle', {cx:CX,cy:CY,r:R+20,fill:'#0d0d0d',stroke:'none'}));
+    board.appendChild(el('circle', {cx:CX,cy:CY,r:R+1,fill:'none',stroke:'#c0c0c0','stroke-width':'2.5'}));
+
+    const segDeg = 18; // 360 / 20
+
+    NUMS.forEach((num, i) => {
+      const a1 = i * segDeg - segDeg / 2;
+      const a2 = a1 + segDeg;
+      const even = i % 2 === 0;
+      const sC  = even ? '#1e1e1e' : '#e8d5a0'; // single: black / cream
+      const dtC = even ? '#c0392b' : '#27ae60';  // double+triple: red / green
+
+      const seg = (d, fill, score, label, mod) => {
+        board.appendChild(el('path', {
+          d, fill, stroke:'#555', 'stroke-width':'0.4',
+          'data-score': score, 'data-label': label, 'data-mod': mod
+        }));
+      };
+
+      seg(arc(rBull, rTi, a1, a2), sC, num,       String(num), 'single');
+      seg(arc(rTi,   rTo, a1, a2), dtC, num * 3,  `T${num}`,   'triple');
+      seg(arc(rTo,   rDi, a1, a2), sC, num,        String(num), 'single');
+      seg(arc(rDi,   rDo, a1, a2), dtC, num * 2,  `D${num}`,   'double');
+
+      // Number labels
+      const [lx, ly] = pc((a1 + a2) / 2, rLbl);
+      const t = el('text', {
+        x: lx, y: ly,
+        'text-anchor': 'middle', 'dominant-baseline': 'middle',
+        fill: '#e8e6df', 'font-size': '14',
+        'font-family': 'Share Tech Mono,monospace',
+        'font-weight': 'bold', 'pointer-events': 'none'
+      });
+      t.textContent = num;
+      board.appendChild(t);
+    });
+
+    // Bull (25) – green ring
+    board.appendChild(el('circle', {
+      cx:CX, cy:CY, r:rBull,
+      fill:'#27ae60', stroke:'#555', 'stroke-width':'0.6',
+      'data-score':'25', 'data-label':'Bull', 'data-mod':'bull'
+    }));
+
+    // Bullseye (50) – red centre
+    board.appendChild(el('circle', {
+      cx:CX, cy:CY, r:rBs,
+      fill:'#c0392b', stroke:'#555', 'stroke-width':'0.6',
+      'data-score':'50', 'data-label':"Bull's Eye", 'data-mod':'bullseye'
+    }));
+
+    // Hover highlight overlays (drawn on top, pointer-events:none)
+    const hlPath = el('path', {d:'', fill:'rgba(255,255,255,0.18)', 'pointer-events':'none'});
+    const hlCirc = el('circle', {cx:CX, cy:CY, r:'0', fill:'rgba(255,255,255,0.18)', 'pointer-events':'none'});
+    board.appendChild(hlPath);
+    board.appendChild(hlCirc);
+
+    // Build lens clone (purely visual, no events)
+    const lensInner = document.getElementById('lens-inner');
+    const clone = board.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;';
+    lensInner.appendChild(clone);
+
+    // Lens highlight elements (keep in sync with main board)
+    const lensHls = clone.querySelectorAll('[fill="rgba(255,255,255,0.18)"]');
+    const lensHlPath = lensHls[0];
+    const lensHlCirc = lensHls[1];
+
+    function setHL(target) {
+      if (target && target.dataset && target.dataset.score) {
+        if (target.tagName === 'path') {
+          const d = target.getAttribute('d');
+          hlPath.setAttribute('d', d);
+          hlCirc.setAttribute('r', '0');
+          lensHlPath && lensHlPath.setAttribute('d', d);
+          lensHlCirc && lensHlCirc.setAttribute('r', '0');
+        } else {
+          const cx2 = target.getAttribute('cx'), cy2 = target.getAttribute('cy'), r2 = target.getAttribute('r');
+          hlPath.setAttribute('d', '');
+          hlCirc.setAttribute('cx', cx2); hlCirc.setAttribute('cy', cy2); hlCirc.setAttribute('r', r2);
+          lensHlPath && lensHlPath.setAttribute('d', '');
+          lensHlCirc && (lensHlCirc.setAttribute('cx', cx2), lensHlCirc.setAttribute('cy', cy2), lensHlCirc.setAttribute('r', r2));
+        }
+      } else {
+        hlPath.setAttribute('d', '');
+        hlCirc.setAttribute('r', '0');
+        lensHlPath && lensHlPath.setAttribute('d', '');
+        lensHlCirc && lensHlCirc.setAttribute('r', '0');
+      }
+    }
+
+    board.addEventListener('mousemove', e => {
+      setHL(e.target);
+      moveLens(e);
+    });
+
+    board.addEventListener('mouseleave', () => {
+      setHL(null);
+      hideLens();
+    });
+
+    board.addEventListener('click', e => {
+      const t = e.target;
+      if (!t.dataset || !t.dataset.score) return;
+      const val   = parseInt(t.dataset.score);
+      const label = t.dataset.label || String(val);
+      const mod   = t.dataset.mod;
+      throwDartDirect(val, label, mod === 'bullseye' ? 'bull' : mod);
+    });
+
+    container.appendChild(board);
+  }
+
+  // ── Magnifying lens helpers ────────────────────────────────────────────────
+  function moveLens(e) {
+    const lensEl    = document.getElementById('dart-lens');
+    const lensInner = document.getElementById('lens-inner');
+    if (!lensEl || !lensInner) return;
+
+    lensEl.style.display = 'block';
+    lensEl.style.left = e.clientX + 'px';
+    lensEl.style.top  = e.clientY + 'px';
+
+    const wrap = document.getElementById('dartboard-wrap');
+    if (!wrap) return;
+    const rect = wrap.getBoundingClientRect();
+
+    const M = 2.8;   // zoom factor
+    const L = 120;   // lens diameter (px)
+
+    const svgEl = lensInner.querySelector('svg');
+    if (svgEl) {
+      svgEl.style.width  = rect.width  * M + 'px';
+      svgEl.style.height = rect.height * M + 'px';
+    }
+
+    const tx = L / 2 - (e.clientX - rect.left)  * M;
+    const ty = L / 2 - (e.clientY - rect.top)   * M;
+    lensInner.style.transform = `translate(${tx}px,${ty}px)`;
+  }
+
+  function hideLens() {
+    const lensEl = document.getElementById('dart-lens');
+    if (lensEl) lensEl.style.display = 'none';
+  }
+
   function endTurn() {
     const p = players[currentPlayer];
     const total = currentThrows.reduce((s, t) => s + t.value, 0);
@@ -1153,6 +1429,7 @@
 
   // ── Render functions ───────────────────────────────────────────────────────
   function renderAll() {
+    buildDartboard();
     renderScoreboard(false);
     renderThrowList();
     renderModifiers();
@@ -1244,5 +1521,10 @@
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
 </script>
+<!-- Magnifying lens (TV dartboard) -->
+<div class="dart-lens" id="dart-lens">
+  <div class="lens-inner" id="lens-inner"></div>
+</div>
+
 </body>
 </html>
