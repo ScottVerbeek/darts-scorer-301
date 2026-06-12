@@ -792,14 +792,138 @@
       .col-right .history-row { font-size: 1.25rem; }
       .col-center .turn-score { font-size: 1.25rem; }
       .col-center .throw-chip { font-size: 1.25rem; }
+
+      /* Killer mode – full-width scoresheet, no centre/right cols */
+      #game-screen[data-mode="killer"] .killer-sheet { font-size: 1.1rem; }
+      #game-screen[data-mode="killer"] .killer-pip { width: 30px; height: 30px; }
+      #game-screen[data-mode="killer"] .killer-pips { gap: 7px; }
+      #game-screen[data-mode="killer"] .killer-sheet td { padding: 8px 6px; }
+    }
+
+    /* ── Game switcher ───────────────────────────────────────────────────── */
+    .game-switcher {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .chevron-btn {
+      background: none;
+      border: none;
+      color: var(--chalk-dim);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 2rem;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0 6px;
+      transition: color 0.15s;
+      user-select: none;
+    }
+    .chevron-btn:hover { color: var(--chalk); }
+
+    /* ── Killer scoresheet ───────────────────────────────────────────────── */
+    /* Killer mode: hide centre/right columns, full-width scoresheet */
+    #game-screen[data-mode="killer"] .col-center,
+    #game-screen[data-mode="killer"] .col-right { display: none !important; }
+    #game-screen[data-mode="killer"] .col-left {
+      width: 100% !important;
+      max-width: 100%;
+      flex: 1;
+      padding: 8px 16px 12px;
+    }
+    #game-screen[data-mode="killer"] .scoreboard {
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+
+    .killer-sheet {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+      table-layout: fixed;
+    }
+    .killer-sheet th {
+      font-family: 'Share Tech Mono', monospace;
+      color: var(--chalk-dim);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 6px 4px;
+      border-bottom: 1px solid var(--border);
+      text-align: center;
+      font-weight: normal;
+    }
+    .killer-sheet td {
+      padding: 5px 4px;
+      text-align: center;
+      border-bottom: 1px solid rgba(48,54,61,0.5);
+    }
+    .killer-sheet tr.target-done td { background: rgba(0,200,83,0.06); }
+    .killer-sheet tr.target-done .target-label { color: var(--green); }
+    .killer-sheet .target-label {
+      color: var(--chalk);
+      font-size: 1rem;
+      font-family: 'Share Tech Mono', monospace;
+      letter-spacing: 1px;
+      text-align: left;
+      padding-left: 8px;
+      width: 3.5rem;
+    }
+    .killer-sheet .target-label-right {
+      text-align: right;
+      padding-left: 0;
+      padding-right: 8px;
+    }
+    .killer-pips {
+      display: flex;
+      gap: 4px;
+      justify-content: center;
+    }
+    .killer-pip {
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      background: var(--border);
+      border: none;
+      cursor: pointer;
+      padding: 0;
+      flex-shrink: 0;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .killer-pip:hover { transform: scale(1.3); }
+    .killer-pip.hit  { background: var(--amber); }
+    .killer-pip.done { background: var(--green); }
+
+    .killer-action-bar {
+      display: flex;
+      gap: 8px;
+      padding: 12px 0 4px;
+      justify-content: flex-end;
+      flex-shrink: 0;
+    }
+
+    /* ── Throw chip: no score (killer 1-9) ───────────────────────────────── */
+    .throw-chip.no-score {
+      opacity: 0.38;
+      border-style: dashed;
+    }
+
+    /* ── Number btn: inactive (killer 1-9) ───────────────────────────────── */
+    .num-btn.inactive {
+      opacity: 0.3;
+      color: var(--chalk-dim);
     }
   </style>
 </head>
 <body>
 
 <header>
-  <h1>🎯 301</h1>
-  <div class="subtitle">Darts Scorer</div>
+  <div class="game-switcher">
+    <button class="chevron-btn" id="prev-game">‹</button>
+    <h1 id="game-title">🎯 301</h1>
+    <button class="chevron-btn" id="next-game">›</button>
+  </div>
+  <div class="subtitle" id="game-subtitle">Darts Scorer</div>
 </header>
 
 <!-- Setup Screen -->
@@ -890,12 +1014,17 @@
 
   // ── State ──────────────────────────────────────────────────────────────────
   const STARTING_SCORE = 301;
+  const GAMES         = ['301', 'killer'];
+  const GAME_TITLES   = { '301': '🎯 301', 'killer': '🎯 10–20 & Bull' };
+  const GAME_SUBTITLES= { '301': 'Darts Scorer', 'killer': 'Killer Variation' };
+  const KILLER_TARGETS = [10,11,12,13,14,15,16,17,18,19,20,'bull'];
 
-  let players = [];       // { name, score, history }
+  let gameMode = '301';   // '301' | 'killer'
+  let players = [];       // { name, score } | { name, targets }
   let currentPlayer = 0;
   let currentMod = null;  // 'double' | 'triple' | 'bull' | null
-  let currentThrows = []; // { label, value, mod } per dart this turn
-  let historyLog = [];    // { player, throws, scoreBefore, scoreAfter, bust }
+  let currentThrows = []; // { label, value, modClass, killerTarget, killerHits }
+  let historyLog = [];    // mode-specific entries
 
   // ── Setup Screen ───────────────────────────────────────────────────────────
   const playerCountBtns = document.querySelectorAll('.pc-btn');
@@ -925,18 +1054,59 @@
 
   renderSetupNames();
 
+  // ── Game switcher ──────────────────────────────────────────────────────────
+  function applyGameTitle() {
+    document.getElementById('game-title').textContent    = GAME_TITLES[gameMode];
+    document.getElementById('game-subtitle').textContent = GAME_SUBTITLES[gameMode];
+    document.title = gameMode === '301' ? '301 Darts' : '10–20 & Bull Darts';
+  }
+
+  function isGameInProgress() {
+    const gs = document.getElementById('game-screen');
+    return gs.style.display !== 'none' && gs.style.display !== '';
+  }
+
+  function switchGame(dir) {
+    const idx  = GAMES.indexOf(gameMode);
+    const next = GAMES[(idx + dir + GAMES.length) % GAMES.length];
+    if (next === gameMode) return;
+    if (isGameInProgress()) {
+      showConfirm('Switch game? Current game will be lost.', () => {
+        gameMode = next;
+        applyGameTitle();
+        goToSetup();
+      });
+    } else {
+      gameMode = next;
+      applyGameTitle();
+    }
+  }
+
+  document.getElementById('prev-game').addEventListener('click', () => switchGame(-1));
+  document.getElementById('next-game').addEventListener('click', () => switchGame(1));
+
   document.getElementById('start-btn').addEventListener('click', () => {
     const inputs = playerNamesDiv.querySelectorAll('input');
-    players = Array.from(inputs).map((inp, i) => ({
-      name: inp.value.trim() || `Player ${i + 1}`,
-      score: STARTING_SCORE,
-      history: []
-    }));
+    if (gameMode === 'killer') {
+      players = Array.from(inputs).map((inp, i) => ({
+        name: inp.value.trim() || `Player ${i + 1}`,
+        targets: Object.fromEntries(KILLER_TARGETS.map(t => [t, 0]))
+      }));
+    } else {
+      players = Array.from(inputs).map((inp, i) => ({
+        name: inp.value.trim() || `Player ${i + 1}`,
+        score: STARTING_SCORE,
+        history: []
+      }));
+    }
     currentPlayer = 0;
     currentThrows = [];
     historyLog = [];
+    const gameScreen = document.getElementById('game-screen');
+    gameScreen.dataset.mode = gameMode;
     document.getElementById('setup-screen-wrap').style.display = 'none';
-    document.getElementById('game-screen').style.display = 'flex';
+    gameScreen.style.display = 'flex';
+    updateNumberGrid();
     applyTvMode();
     renderAll();
   });
@@ -949,6 +1119,13 @@
     btn.textContent = n;
     btn.addEventListener('click', () => throwDart(n));
     grid.appendChild(btn);
+  }
+
+  function updateNumberGrid() {
+    document.querySelectorAll('#number-grid .num-btn').forEach(btn => {
+      const n = parseInt(btn.textContent);
+      btn.classList.toggle('inactive', gameMode === 'killer' && n < 10);
+    });
   }
 
   // ── Modifier buttons ───────────────────────────────────────────────────────
@@ -998,24 +1175,28 @@
   function throwDart(input) {
     if (currentThrows.length >= 3) return;
 
-    let value, label, modClass = '';
+    let value, label, modClass = '', killerTarget = null, killerHits = 0;
 
     if (input === 'bull') {
       value = 25; label = 'Bull'; modClass = 'bull';
+      killerTarget = 'bull'; killerHits = 1;
     } else if (input === 'bullseye') {
       value = 50; label = "Bull's Eye"; modClass = 'bull';
+      killerTarget = 'bull'; killerHits = 2;
     } else {
       const num = input;
       if (currentMod === 'double') {
-        value = num * 2; label = `D${num}`; modClass = 'double';
+        value = num * 2; label = `D${num}`; modClass = 'double'; killerHits = 2;
       } else if (currentMod === 'triple') {
-        value = num * 3; label = `T${num}`; modClass = 'triple';
+        value = num * 3; label = `T${num}`; modClass = 'triple'; killerHits = 3;
       } else {
-        value = num; label = `${num}`;
+        value = num; label = `${num}`; killerHits = 1;
       }
+      killerTarget = (num >= 10) ? num : null;
+      if (!killerTarget) killerHits = 0;
     }
 
-    currentThrows.push({ label, value, modClass });
+    currentThrows.push({ label, value, modClass, killerTarget, killerHits });
     currentMod = null;
 
     renderModifiers();
@@ -1036,7 +1217,7 @@
   window.throwDart = function(input) {
     if (input === 0) {
       if (currentThrows.length >= 3) return;
-      currentThrows.push({ label: 'Miss', value: 0, modClass: '' });
+      currentThrows.push({ label: 'Miss', value: 0, modClass: '', killerTarget: null, killerHits: 0 });
       currentMod = null;
       renderModifiers();
       renderThrowList();
@@ -1050,7 +1231,19 @@
   // ── Direct throw (used by dartboard SVG) ──────────────────────────────────
   function throwDartDirect(value, label, modClass) {
     if (currentThrows.length >= 3) return;
-    currentThrows.push({ label, value, modClass: modClass === 'single' ? '' : modClass });
+    const mc = modClass === 'single' ? '' : modClass;
+    let killerTarget = null, killerHits = 0;
+    if (gameMode === 'killer') {
+      if (mc === 'bull') {
+        killerTarget = 'bull';
+        killerHits = (value === 50) ? 2 : 1;
+      } else {
+        const mult = mc === 'double' ? 2 : mc === 'triple' ? 3 : 1;
+        const seg = value / mult;
+        if (seg >= 10) { killerTarget = seg; killerHits = mult; }
+      }
+    }
+    currentThrows.push({ label, value, modClass: mc, killerTarget, killerHits });
     renderModifiers();
     renderThrowList();
     renderScoreboard(true);
@@ -1250,6 +1443,10 @@
   }
 
   function endTurn() {
+    if (gameMode === 'killer') { endTurnKiller(); } else { endTurn301(); }
+  }
+
+  function endTurn301() {
     const p = players[currentPlayer];
     const total = currentThrows.reduce((s, t) => s + t.value, 0);
     const scoreBefore = p.score;
@@ -1287,12 +1484,45 @@
     }
     currentMod = null;
 
-    setTimeout(() => {
-      if (!bust) {
-        // already advanced
-      }
-      renderAll();
-    }, bust ? 900 : 0);
+    setTimeout(() => { renderAll(); }, bust ? 900 : 0);
+  }
+
+  function endTurnKiller() {
+    const p = players[currentPlayer];
+    const targetsBefore = { ...p.targets };
+    const completedThisTurn = [];
+
+    currentThrows.forEach(t => {
+      if (!t.killerTarget) return;
+      const key  = t.killerTarget;
+      const prev = p.targets[key];
+      p.targets[key] = Math.min(3, prev + t.killerHits);
+      if (prev < 3 && p.targets[key] === 3) completedThisTurn.push(key);
+    });
+
+    const totalDone = KILLER_TARGETS.filter(k => p.targets[k] === 3).length;
+
+    historyLog.push({
+      mode: 'killer',
+      player: p.name,
+      throws: currentThrows.map(t => t.label).join(', '),
+      completed: completedThisTurn,
+      targetsBefore,
+      totalDone
+    });
+
+    currentThrows = [];
+    currentMod = null;
+
+    if (totalDone === KILLER_TARGETS.length) {
+      showWin(p.name);
+      renderScoreboard(false);
+      renderHistory();
+      return;
+    }
+
+    currentPlayer = (currentPlayer + 1) % players.length;
+    renderAll();
   }
 
   // ── Bust ───────────────────────────────────────────────────────────────────
@@ -1310,13 +1540,18 @@
   // ── Win ────────────────────────────────────────────────────────────────────
   function showWin(name) {
     document.getElementById('win-title').textContent = `🎯 ${name.toUpperCase()}`;
-    document.getElementById('win-subtitle').textContent = 'HITS EXACTLY 301!';
+    document.getElementById('win-subtitle').textContent =
+      gameMode === 'killer' ? 'COMPLETES ALL TARGETS!' : 'HITS EXACTLY 301!';
     document.getElementById('win-overlay').classList.add('show');
   }
 
   document.getElementById('play-again-btn').addEventListener('click', () => {
     document.getElementById('win-overlay').classList.remove('show');
-    players.forEach(p => p.score = STARTING_SCORE);
+    if (gameMode === 'killer') {
+      players.forEach(p => { p.targets = Object.fromEntries(KILLER_TARGETS.map(t => [t, 0])); });
+    } else {
+      players.forEach(p => p.score = STARTING_SCORE);
+    }
     currentPlayer = 0; currentThrows = []; historyLog = []; currentMod = null;
     applyTvMode();
     renderAll();
@@ -1338,7 +1573,13 @@
     } else if (historyLog.length > 0) {
       const last = historyLog.pop();
       const idx = players.findIndex(p => p.name === last.player);
-      if (idx !== -1) players[idx].score = last.scoreBefore;
+      if (idx !== -1) {
+        if (gameMode === 'killer') {
+          players[idx].targets = last.targetsBefore;
+        } else {
+          players[idx].score = last.scoreBefore;
+        }
+      }
       currentPlayer = idx;
       currentMod = null;
       renderAll();
@@ -1346,8 +1587,13 @@
   });
 
   document.getElementById('reset-btn').addEventListener('click', () => {
-    showConfirm('Reset scores to 301?', () => {
-      players.forEach(p => p.score = STARTING_SCORE);
+    const msg = gameMode === 'killer' ? 'Reset all targets?' : 'Reset scores to 301?';
+    showConfirm(msg, () => {
+      if (gameMode === 'killer') {
+        players.forEach(p => { p.targets = Object.fromEntries(KILLER_TARGETS.map(t => [t, 0])); });
+      } else {
+        players.forEach(p => p.score = STARTING_SCORE);
+      }
       currentPlayer = 0; currentThrows = []; historyLog = []; currentMod = null;
       renderAll();
     });
@@ -1445,6 +1691,8 @@
 
   // ── Render functions ───────────────────────────────────────────────────────
   function renderAll() {
+    document.getElementById('game-screen').dataset.mode = gameMode;
+    updateNumberGrid();
     buildDartboard();
     renderScoreboard(false);
     renderThrowList();
@@ -1453,6 +1701,10 @@
   }
 
   function renderScoreboard(preview) {
+    if (gameMode === 'killer') { renderScoreboardKiller(); } else { renderScoreboard301(preview); }
+  }
+
+  function renderScoreboard301(preview) {
     const sb = document.getElementById('scoreboard');
     sb.innerHTML = '';
 
@@ -1476,7 +1728,6 @@
       const isBust = preview && i === currentPlayer && previewScore < 0;
       if (isBust) card.classList.add('bust');
 
-      // Darts pips
       let pips = '';
       for (let d = 0; d < 3; d++) {
         const thrown = i === currentPlayer && d < currentThrows.length;
@@ -1494,21 +1745,116 @@
     });
   }
 
+  function renderScoreboardKiller() {
+    const sb = document.getElementById('scoreboard');
+    sb.innerHTML = '';
+
+    const table = document.createElement('table');
+    table.className = 'killer-sheet';
+
+    const thead = document.createElement('thead');
+    const hRow  = document.createElement('tr');
+    hRow.innerHTML = '<th class="target-label"></th>';
+    players.forEach(pl => {
+      const th = document.createElement('th');
+      th.textContent = pl.name;
+      hRow.appendChild(th);
+    });
+    hRow.innerHTML += '<th class="target-label target-label-right"></th>';
+    thead.appendChild(hRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    KILLER_TARGETS.forEach(target => {
+      const allDone = players.every(pl => pl.targets[target] === 3);
+      const row = document.createElement('tr');
+      if (allDone) row.classList.add('target-done');
+
+      const lbl = document.createElement('td');
+      lbl.className = 'target-label';
+      lbl.textContent = target === 'bull' ? 'Bull' : target;
+      row.appendChild(lbl);
+
+      players.forEach((pl, playerIdx) => {
+        const hits = pl.targets[target];
+        const cell = document.createElement('td');
+        const pipsDiv = document.createElement('div');
+        pipsDiv.className = 'killer-pips';
+        for (let d = 0; d < 3; d++) {
+          const pip = document.createElement('button');
+          pip.className = 'killer-pip' + (d < hits ? (hits >= 3 ? ' done' : ' hit') : '');
+          pip.setAttribute('aria-label', `${pl.name} ${target === 'bull' ? 'Bull' : target} hit ${d + 1}`);
+          pip.addEventListener('click', () => killerTogglePip(playerIdx, target, d));
+          pipsDiv.appendChild(pip);
+        }
+        cell.appendChild(pipsDiv);
+        row.appendChild(cell);
+      });
+
+      // Right-side label
+      const lblR = document.createElement('td');
+      lblR.className = 'target-label target-label-right';
+      lblR.textContent = target === 'bull' ? 'Bull' : target;
+      row.appendChild(lblR);
+
+      tbody.appendChild(row);
+    });
+    table.appendChild(tbody);
+    sb.appendChild(table);
+
+    // Action bar: Reset + Quit
+    const bar = document.createElement('div');
+    bar.className = 'killer-action-bar';
+    bar.innerHTML = `
+      <button class="action-btn reset" id="k-reset-btn">↺ Reset</button>
+      <button class="action-btn quit" id="k-quit-btn">✕ Quit</button>
+    `;
+    sb.appendChild(bar);
+
+    bar.querySelector('#k-reset-btn').addEventListener('click', () => {
+      showConfirm('Reset all targets?', () => {
+        players.forEach(p => { p.targets = Object.fromEntries(KILLER_TARGETS.map(t => [t, 0])); });
+        renderScoreboardKiller();
+      });
+    });
+    bar.querySelector('#k-quit-btn').addEventListener('click', () => {
+      showConfirm('Quit game?', () => goToSetup());
+    });
+  }
+
+  function killerTogglePip(playerIdx, target, pipIdx) {
+    const p = players[playerIdx];
+    const hits = p.targets[target];
+    // clicking below current level removes hits down to pipIdx; clicking at/above adds up to pipIdx+1
+    p.targets[target] = hits > pipIdx ? pipIdx : pipIdx + 1;
+
+    const totalDone = KILLER_TARGETS.filter(k => p.targets[k] === 3).length;
+    renderScoreboardKiller();
+    if (totalDone === KILLER_TARGETS.length) {
+      showWin(p.name);
+    }
+  }
+
   function renderThrowList() {
     const tl = document.getElementById('throw-list');
     tl.innerHTML = '';
     currentThrows.forEach(t => {
       const chip = document.createElement('div');
-      chip.className = 'throw-chip' + (t.modClass ? ' ' + t.modClass : '');
-      chip.textContent = t.label + (t.value > 0 ? ` (${t.value})` : '');
+      if (gameMode === 'killer') {
+        const noScore = !t.killerTarget;
+        chip.className = 'throw-chip' + (t.modClass ? ' ' + t.modClass : '') + (noScore ? ' no-score' : '');
+        chip.textContent = noScore ? `${t.label} ✕` : `${t.label} (+${t.killerHits})`;
+      } else {
+        chip.className = 'throw-chip' + (t.modClass ? ' ' + t.modClass : '');
+        chip.textContent = t.label + (t.value > 0 ? ` (${t.value})` : '');
+      }
       tl.appendChild(chip);
     });
   }
 
   function renderModifiers() {
     document.querySelectorAll('.mod-btn').forEach(btn => {
-      const mod = btn.dataset.mod;
-      btn.classList.toggle('active-mod', mod === currentMod);
+      btn.classList.toggle('active-mod', btn.dataset.mod === currentMod);
     });
   }
 
@@ -1523,11 +1869,22 @@
     [...historyLog].reverse().forEach(row => {
       const el = document.createElement('div');
       el.className = 'history-row';
-      el.innerHTML = `
-        <span class="h-player">${row.player}</span>
-        <span>${row.throws}</span>
-        <span>${row.bust ? '<span class="h-bust">BUST</span>' : `−${row.total} → ${row.scoreAfter}`}</span>
-      `;
+      if (row.mode === 'killer') {
+        const compStr = row.completed.length
+          ? row.completed.map(t => (t === 'bull' ? 'Bull' : t) + '✓').join(' ')
+          : '–';
+        el.innerHTML = `
+          <span class="h-player">${row.player}</span>
+          <span>${row.throws}</span>
+          <span>${compStr} <span style="color:var(--chalk-dim)">${row.totalDone}/12</span></span>
+        `;
+      } else {
+        el.innerHTML = `
+          <span class="h-player">${row.player}</span>
+          <span>${row.throws}</span>
+          <span>${row.bust ? '<span class="h-bust">BUST</span>' : `−${row.total} → ${row.scoreAfter}`}</span>
+        `;
+      }
       panel.appendChild(el);
     });
   }
