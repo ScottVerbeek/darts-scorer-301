@@ -587,6 +587,23 @@
         inset 0 1px 3px rgba(255,255,255,0.15);
     }
 
+    .lens-label {
+      position: fixed;
+      z-index: 501;
+      display: none;
+      pointer-events: none;
+      transform: translate(-50%, 0);
+      padding: 2px 10px;
+      border-radius: 6px;
+      background: rgba(0,0,0,0.85);
+      border: 1px solid rgba(210,215,240,0.75);
+      color: #fff;
+      font-family: 'Share Tech Mono', monospace;
+      font-weight: bold;
+      font-size: 1.1rem;
+      white-space: nowrap;
+    }
+
     .dart-lens::before {
       content: '';
       position: absolute;
@@ -1389,7 +1406,9 @@
 
     board.addEventListener('mousemove', e => {
       setHL(e.target);
-      moveLens(e);
+      const d = e.target.dataset;
+      const lbl = d && d.score ? d.label : '';
+      moveLens(e, lbl);
     });
 
     board.addEventListener('mouseleave', () => {
@@ -1410,7 +1429,7 @@
   }
 
   // ── Magnifying lens helpers ────────────────────────────────────────────────
-  function moveLens(e) {
+  function moveLens(e, text) {
     const lensEl    = document.getElementById('dart-lens');
     const lensInner = document.getElementById('lens-inner');
     if (!lensEl || !lensInner) return;
@@ -1418,6 +1437,14 @@
     lensEl.style.display = 'block';
     lensEl.style.left = e.clientX + 'px';
     lensEl.style.top  = e.clientY + 'px';
+
+    const labelEl = document.getElementById('lens-label');
+    if (labelEl) {
+      labelEl.textContent = text || '';
+      labelEl.style.display = text ? 'block' : 'none';
+      labelEl.style.left = e.clientX + 'px';
+      labelEl.style.top  = (e.clientY + 66) + 'px';
+    }
 
     const wrap = document.getElementById('dartboard-wrap');
     if (!wrap) return;
@@ -1440,6 +1467,8 @@
   function hideLens() {
     const lensEl = document.getElementById('dart-lens');
     if (lensEl) lensEl.style.display = 'none';
+    const labelEl = document.getElementById('lens-label');
+    if (labelEl) labelEl.style.display = 'none';
   }
 
   function endTurn() {
@@ -1898,6 +1927,7 @@
 <div class="dart-lens" id="dart-lens">
   <div class="lens-inner" id="lens-inner"></div>
 </div>
+<div class="lens-label" id="lens-label"></div>
 
 </body>
 </html>
